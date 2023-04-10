@@ -1,0 +1,5 @@
+defaults:
+  - override hydra/help: help
+  - dataset: nerf_synthetic
+  
+
