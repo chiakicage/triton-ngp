@@ -1,2 +1,14 @@
 name: nerf_synthetic
 path: data/nerf_synthetic
+
+dataset_module: lib.datasets.nerf_synthetic
+
+train_dataset:
+    split: 'train'
+    view: 0
+    input_ratio: 1.
+
+test_dataset:
+    split: 'test'
+    view: 0
+    input_ratio: 0.5

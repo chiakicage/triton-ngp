@@ -1,5 +1,6 @@
 defaults:
-  - override hydra/help: help
   - dataset: nerf_synthetic
+  - task: nerf
+  - override hydra/help: help
   
 
