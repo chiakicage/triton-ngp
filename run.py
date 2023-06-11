@@ -4,6 +4,10 @@ from hydra.core.config_store import ConfigStore
 
 from lib.config import Config, DatasetConfig
 from lib.datasets import make_dataset
+from lib.models.encoder import make_encoder
+from lib.models.nerf import Network
+from lib.train.trainer import Trainer
+import os
 
 cs = ConfigStore.instance()
 cs.store(name="base_config", node=Config)
@@ -12,8 +16,14 @@ cs.store(name="base_config", node=Config)
 def main(cfg: Config):
 	print(cfg.dataset)
 	print(OmegaConf.to_yaml(cfg))
+	cfg.task
 	dataset = make_dataset(cfg.dataset)
-	print(dataset[0])
+	network = Network(cfg.task)
+	trainer = Trainer(network, cfg)
+	trainer.train(dataset)
+	# encoder = make_encoder(cfg.task)
+	# print(dataset[0])
+	# print(os.getcwd())
 
 if __name__ == "__main__":
 	main()

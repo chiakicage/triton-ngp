@@ -7,6 +7,9 @@ import cv2
 import imageio
 import os
 import matplotlib.pyplot as plt
+import logging
+
+logger = logging.getLogger("dataset")
 
 
 class Dataset(data.Dataset):
@@ -18,24 +21,36 @@ class Dataset(data.Dataset):
         self.split = split_dataset.split
         self.input_ratio = split_dataset.input_ratio
         self.batch_size = batch_size
+        self.poses = []
+        self.imgs = []
         image_paths = []
         json_info = json.load(
             open(os.path.join(self.data_root, f'transforms_{self.split}.json')))
+
         for frame in json_info['frames']:
-            image_paths.append(os.path.join(
-                self.data_root, frame['file_path'][2:] + '.png'))
-        self.imgs = [np.asarray(imageio.imread(image_path)).astype(
-            np.float32) / 255. for image_path in image_paths]
-        self.imgs = [img[..., :3] * img[..., -1:] + 1 - img[..., -1:]
-                     for img in self.imgs]
+            image_path = os.path.join(
+                self.data_root, frame['file_path'][2:] + '.png')
+            img = np.asarray(imageio.imread(image_path)).astype(np.float32) / 255.
+            img = img[..., :3] * img[..., -1:] + 1 - img[..., -1:]
+            self.imgs.append(img)
+            pose = np.array(frame['transform_matrix'])
+            self.poses.append(pose)
+
         H, W = self.imgs[0].shape[:2]
-        self.H = H
-        self.W = W
-        imgs = [cv2.resize(img, (int(W * self.input_ratio),
-                           int(H * self.input_ratio))) for img in self.imgs]
-        
+        FOV = float(json_info['camera_angle_x'])
+        self.H = int(H * self.input_ratio)
+        self.W = int(W * self.input_ratio)
+        self.focal = 0.5 * self.W / np.tan(0.5 * FOV)
+        self.internal = np.array([
+            [self.focal, 0, 0.5 * self.W],
+            [0, self.focal, 0.5 * self.H],
+            [0, 0, 1]
+        ])
+        logger.info(f"internal: {self.internal}")
+        self.imgs = [cv2.resize(img, (self.W, self.H)) for img in self.imgs]
+
         X, Y = np.meshgrid(np.arange(W), np.arange(H))
-        u, v = X.astype(np.float32) / (W - 1), Y.astype(np.float32) / (H - 1)
+        u, v = X.astype(np.float32), Y.astype(np.float32)
         self.uv = np.stack([u, v], axis=-1).reshape(-1, 2).astype(np.float32)
 
     def __getitem__(self, index):
@@ -43,11 +58,20 @@ class Dataset(data.Dataset):
             ids = np.random.choice(
                 len(self.uv), self.batch_size, replace=False)
             uv = self.uv[ids]
+            
             rgb = self.imgs[index].reshape(-1, 3)[ids]
         else:
             uv = self.uv
             rgb = self.imgs[index].reshape(-1, 3)
-        ret = {'uv': uv, 'rgb': rgb}
+        rays_x = (uv[..., 0] - self.internal[0, 2]) / self.internal[0, 0]
+        rays_y = (uv[..., 1] - self.internal[1, 2]) / self.internal[1, 1]
+        rays_z = np.ones_like(rays_x)
+        rays_d = np.stack([rays_x, rays_y, rays_z], axis=-1)
+        rays_d = rays_d / np.linalg.norm(rays_d, axis=-1, keepdims=True)
+        c2w = self.poses[index]
+        rays_d = rays_d @ c2w[:3, :3].T
+        rays_o = np.broadcast_to(c2w[:3, -1], rays_d.shape)
+        ret = {'uv': uv, 'rgb': rgb, 'rays_o': rays_o, 'rays_d': rays_d}
         return ret
 
     def __len__(self):

@@ -1,5 +1,21 @@
+
+
 train:
   batch_size: 1
   lr: 5e-4
   weight_decay: 0.
   num_epochs: 1000
+
+network:
+  base_mlp_D: 8
+  base_mlp_W: 256
+  head_mlp_D: 3
+  head_mlp_W: 128
+  xyz_encoder:
+    type: frequency
+    input_dim: 3
+    L: 10
+  dir_encoder:
+    type: frequency
+    input_dim: 3
+    L: 4
