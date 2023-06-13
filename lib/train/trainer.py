@@ -16,13 +16,11 @@ logger = logging.getLogger("trainer")
 
 
 class Trainer:
-    def __init__(self, radiance_field: Network, cfg: TaskConfig):
+    def __init__(self, radiance_field: Network, estimator: nerfacc.OccGridEstimator, cfg: TaskConfig):
         self.device = cfg.device
         self.radiance_field = radiance_field
         self.radiance_field = self.radiance_field.to(self.device)
-        self.estimator = nerfacc.OccGridEstimator(
-            roi_aabb=torch.tensor([-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]).to(self.device),
-        ).to(self.device)
+        self.estimator = estimator.to(self.device)
         self.optimizer = Adam(
             self.radiance_field.parameters(),
             lr=5e-4,
