@@ -8,3 +8,5 @@ nerfacc
 opencv-python
 matplotlib
 imageio
+plyfile
+

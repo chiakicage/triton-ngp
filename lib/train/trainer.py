@@ -10,6 +10,7 @@ import logging
 from lib.models.nerf import Network
 from lib.config.task import TaskConfig
 import imageio
+from plyfile import PlyData, PlyElement
 
 logger = logging.getLogger("trainer")
 
@@ -46,6 +47,14 @@ class Trainer:
         max_steps = self.max_steps
         eval_step = 1000
         target_sample_batch_size = 1 << 18
+
+        # model_save_path = "results/model.pth"
+        # checkpoint = torch.load(model_save_path)
+        # init_step = checkpoint["step"]
+        # self.radiance_field.load_state_dict(checkpoint["radiance_field_state_dict"])
+        # self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        # self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+        # self.estimator.load_state_dict(checkpoint["estimator_state_dict"])
 
         for step in tqdm(range(max_steps)):
             self.radiance_field.train()
@@ -151,11 +160,22 @@ class Trainer:
             # logger.info(f"loss: {loss.item()}")
             tqdm.write(f"loss: {loss.item()} pnsr: {pnsr.item()}")
             if (step + 1) % eval_step == 0:
+                model_save_path = "results/model.pth"
+                torch.save(
+                    {
+                        "step": step,
+                        "radiance_field_state_dict": self.radiance_field.state_dict(),
+                        "optimizer_state_dict": self.optimizer.state_dict(),
+                        "scheduler_state_dict": self.scheduler.state_dict(),
+                        "estimator_state_dict": self.estimator.state_dict(),
+                    },
+                    model_save_path,
+                )
                 self.radiance_field.eval()
                 self.estimator.eval()
                 with torch.no_grad():
                     # i = torch.randint(0, len(test_dataset), (1,)).item()
-                    i = 0
+                    i = 20
                     data = test_dataset[i]
                     # print(test_dataset.H)
                     # print(test_dataset.imgs[i].shape)
@@ -163,8 +183,26 @@ class Trainer:
                     rays_o_all = torch.tensor(data["rays_o"])
                     rays_d_all = torch.tensor(data["rays_d"])
                     rgb_gt_all = torch.tensor(data["rgb"])
+                    # print(rays_o_all.shape)
                     test_png = []
                     losses = []
+                    samples = []
+                    rays_sample = np.random.choice(rays_o_all.shape[0], 2000)
+                    rays_select = np.arange(
+                        test_dataset.H // 2 * test_dataset.W,
+                        test_dataset.H // 2 * test_dataset.W + test_dataset.W ,
+                        1,
+                        dtype=np.int32,
+                    )
+                    # rays_select = [
+                    #     test_dataset.H // 2 * test_dataset.W + test_dataset.W // 16,
+                    #     test_dataset.H // 2 * test_dataset.W + test_dataset.W // 8,
+                    #     test_dataset.H // 2 * test_dataset.W + test_dataset.W // 4,
+                    # ]
+                    # print(rays_sample, rays_select)
+
+                    select = []
+                    graph = np.zeros((test_dataset.H, test_dataset.W)).reshape(-1)
                     for i in range(0, rays_o_all.shape[0], chunk_size):
                         rays_o = rays_o_all[i : i + chunk_size].to(self.device)
                         rays_d = rays_d_all[i : i + chunk_size].to(self.device)
@@ -200,6 +238,47 @@ class Trainer:
                             cone_angle=cone_angle,
                             stratified=self.radiance_field.training,
                         )
+
+                        # print(ray_indices)
+                        # mask = torch.repeat_interleave(
+                        #     torch.tensor(False), ray_indices.shape[0]
+                        # ).to(self.device)
+                        # for ray in rays_sample:
+                        #     mask = torch.logical_or(mask, ray_indices == (ray - i))
+                        # t_origins = rays_o[ray_indices[mask]]
+                        # t_directions = rays_d[ray_indices[mask]]
+                        # positions = (
+                        #     t_origins
+                        #     + t_directions
+                        #     * (t_starts[mask] + t_ends[mask])[:, None]
+                        #     / 2.0
+                        # )
+                        # # print(positions.shape)
+                        # samples.append(positions.cpu().numpy())
+
+                        # pixel_indices = np.unique(ray_indices.cpu().numpy()) + i
+                        # # print(pixel_indices)
+                        # graph[pixel_indices] = 1
+                        # # print(np.unique(ray_indices.cpu().numpy()).max())
+
+                        # mask = torch.repeat_interleave(
+                        #     torch.tensor(False), ray_indices.shape[0]
+                        # ).to(self.device)
+                        # # print(ray_indices)
+                        # for ray in rays_select:
+                        #     mask = torch.logical_or(mask, ray_indices == (ray - i))
+                        #     # print((ray_indices == ray).sum())
+                        # t_origins = rays_o[ray_indices[mask]]
+                        # t_directions = rays_d[ray_indices[mask]]
+                        # positions = (
+                        #     t_origins
+                        #     + t_directions
+                        #     * (t_starts[mask] + t_ends[mask])[:, None]
+                        #     / 2.0
+                        # )
+                        # # print(positions.shape)
+                        # select.append(positions.cpu().numpy())
+
                         # print(ray_indices.shape)
                         rgb, density, depth, extras = nerfacc.rendering(
                             t_starts,
@@ -214,6 +293,20 @@ class Trainer:
                         losses.append(loss.item())
                         # pnsr = -10.0 * torch.log(loss) / np.log(10.0)
                         test_png.append((rgb.cpu().numpy() * 255).astype(np.uint8))
+                    # samples = np.concatenate(samples, axis=0)
+                    # vertex = np.array(
+                    #     list(map(tuple, samples)),
+                    #     dtype=[("x", "f4"), ("y", "f4"), ("z", "f4")],
+                    # )
+                    # el = PlyElement.describe(vertex, "vertex")
+                    # PlyData([el]).write(f"results/sample_binary_{step+1}.ply")
+                    # select = np.concatenate(select, axis=0)
+                    # vertex = np.array(
+                    #     list(map(tuple, select)),
+                    #     dtype=[("x", "f4"), ("y", "f4"), ("z", "f4")],
+                    # )
+                    # el = PlyElement.describe(vertex, "vertex")
+                    # PlyData([el]).write(f"results/select_binary_{step+1}.ply")
                     tqdm.write(f"eval loss: {np.mean(losses)}")
 
                     test_png = np.concatenate(test_png, axis=0).reshape(
@@ -224,8 +317,14 @@ class Trainer:
                         .astype(np.uint8)
                         .reshape(test_dataset.H, test_dataset.W, 3)
                     )
+                    # graph = np.stack([graph, graph, graph], axis=-1)
+                    # pixel = (
+                    #     (graph * 255)
+                    #     .astype(np.uint8)
+                    #     .reshape(test_dataset.H, test_dataset.W, 3)
+                    # )
 
                     output = np.concatenate([test_png, gt_png], axis=1)
                     imageio.imwrite(f"results/test_{step+1}.png", output)
-
+            # return
             # print(f'loss: {loss.item()}')
