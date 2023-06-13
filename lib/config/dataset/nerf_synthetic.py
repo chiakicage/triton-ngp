@@ -11,6 +11,7 @@ class SplitConfig:
 @dataclass
 class SyntheticDatasetConfig(DatasetConfig):
 	scene: str
+	init_rays_num: int
 	train_dataset: SplitConfig
 	test_dataset: SplitConfig
 

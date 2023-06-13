@@ -8,6 +8,10 @@ from lib.config.task.nerf import NeRFConfig
 from lib.models.activation import trunc_exp
 from typing import Tuple
 import nerfacc
+import logging
+import ipdb
+
+logger = logging.getLogger("nerf")
 
 
 class Network(nn.Module):
@@ -32,40 +36,31 @@ class Network(nn.Module):
             activation=nn.ReLU(),
             out_activation=nn.Sigmoid(),
         )
+        self.initialize_weights()
+    
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
-    def get_density(self, position: torch.Tensor):
-        base_mlp_output = self.base_mlp(self.xyz_encoder(position))
+    def get_density(self, positions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        base_mlp_output = self.base_mlp(self.xyz_encoder(positions))
         density, base_mlp_output = torch.split(
-            base_mlp_output, [1, base_mlp_output.shape[-1] - 1], dim=-1)
-        density = trunc_exp(density)
+            base_mlp_output, [1, base_mlp_output.shape[-1] - 1], dim=-1
+        )
+        density = trunc_exp(density).view(-1)
         return density, base_mlp_output
 
-    def get_rgb(self, direction: torch.Tensor, mlp_out: torch.Tensor):
-        rgb = self.head_mlp(
-            torch.cat([self.dir_encoder(direction), mlp_out], dim=-1))
+    def get_rgb(self, directions: torch.Tensor, mlp_out: torch.Tensor) -> torch.Tensor:
+        rgb = self.head_mlp(torch.cat([self.dir_encoder(directions), mlp_out], dim=-1))
         return rgb
 
-    def forward(self, rays_o, rays_d, estimator):
-        def sigma_fn(t_starts, t_ends, ray_indices):
-            t_origins = rays_o[ray_indices]
-            t_directions = rays_d[ray_indices]
-            positions = t_origins + t_directions * (t_starts + t_ends)[:, None] / 2.0
-            density, _ = self.get_density(positions)
-            return density
-        def rgb_sigma_fn(t_starts, t_ends, ray_indices):
-            t_origins = rays_o[ray_indices]
-            t_directions = rays_d[ray_indices]
-            positions = t_origins + t_directions * (t_starts + t_ends)[:, None] / 2.0
-            density, mlp_out = self.get_density(positions)
-            rgb = self.get_rgb(t_directions, mlp_out)
-            return rgb, density
-        ray_indices, t_starts, t_ends = estimator.sampling(
-            rays_o, rays_d, sigma_fn=sigma_fn, early_stop_eps=1e-4, alpha_thre=1e-2
-        )
+    def forward(self, positions: torch.Tensor, directions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        density, mlp_out = self.get_density(positions)
+        rgb = self.get_rgb(directions, mlp_out)
+        return rgb, density
 
-        rgb, density, depth, extras = nerfacc.rendering(
-            t_starts, t_ends, ray_indices, n_rays=rays_o.shape[0], rgb_sigma_fn=rgb_sigma_fn
-        )
 
-        return rgb, density, depth, extras
-
+    

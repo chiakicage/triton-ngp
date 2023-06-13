@@ -14,5 +14,11 @@ class _trunc_exp(Function):
     def backward(ctx, g):
         x = ctx.saved_tensors[0]
         return g * torch.exp(x.clamp(-15, 15))
+    
+def trunc_exp(x) -> torch.Tensor:
+    res = _trunc_exp.apply(x)
+    if res is not None:
+        return res
+    else:
+        return torch.zeros(0)
 
-trunc_exp = _trunc_exp.apply

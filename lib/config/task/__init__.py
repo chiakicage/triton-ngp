@@ -13,4 +13,5 @@ class TaskConfig:
     # loss_module: str
     # evaluator_module: str
     # visualizer_module: str
+    device: str
     train: TrainConfig
