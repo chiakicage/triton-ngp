@@ -9,7 +9,6 @@ from lib.models.activation import trunc_exp
 from typing import Tuple
 import nerfacc
 import logging
-import ipdb
 
 logger = logging.getLogger("nerf")
 

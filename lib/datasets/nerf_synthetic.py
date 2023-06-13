@@ -56,22 +56,25 @@ class Dataset(data.Dataset):
     def update_rays_num(self, rays_num):
         self.rays_num = rays_num
 
-    def __getitem__(self, index):
+    def get_rays(self, img, c2w):
         if self.split == "train":
             ids = np.random.choice(len(self.uv), self.rays_num, replace=False)
             uv = self.uv[ids]
-            rgb = self.imgs[index].reshape(-1, 3)[ids]
+            rgb = img.reshape(-1, 3)[ids]
         else:
             uv = self.uv
-            rgb = self.imgs[index].reshape(-1, 3)
+            rgb = img.reshape(-1, 3)
         rays_x = (uv[..., 0] - self.K[0, 2] + 0.5) / self.K[0, 0]
         rays_y = -(uv[..., 1] - self.K[1, 2] + 0.5) / self.K[1, 1]
         rays_z = -np.ones_like(rays_x)
         rays_d = np.stack([rays_x, rays_y, rays_z], axis=-1)
-        c2w = self.c2ws[index]
         rays_d = rays_d @ c2w[:3, :3].T
         rays_d = rays_d / np.linalg.norm(rays_d, axis=-1, keepdims=True)
         rays_o = np.broadcast_to(c2w[:3, -1], rays_d.shape)
+        return uv, rays_o, rays_d, rgb
+
+    def __getitem__(self, index):
+        uv, rays_o, rays_d, rgb = self.get_rays(self.imgs[index], self.c2ws[index])
         uv = uv.astype(np.float32)
         rays_o = rays_o.astype(np.float32)
         rays_d = rays_d.astype(np.float32)
