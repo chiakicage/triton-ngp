@@ -15,11 +15,22 @@ class SphericalHarmonicsEncoderConfig(EncoderConfig):
     level: int
 
 @dataclass
+class HashEncodingConfig(EncoderConfig):
+    L: int
+    F: int
+    logT: int
+    Nmin: int
+    Nmax: int
+    x_min: float
+    x_max: float
+
+@dataclass
 class NetworkConfig:
     base_mlp_D: int
     base_mlp_W: int
     head_mlp_D: int
     head_mlp_W: int
+    geo_feat_dim: int
     xyz_encoder: EncoderConfig
     dir_encoder: EncoderConfig
 

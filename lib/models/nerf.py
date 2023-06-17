@@ -9,6 +9,8 @@ from lib.models.activation import trunc_exp
 from typing import Tuple
 import nerfacc
 import logging
+import math
+import tinycudann as tcnn
 
 logger = logging.getLogger("nerf")
 
@@ -17,18 +19,25 @@ class Network(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
+        scaler = math.exp(
+            (
+                math.log(cfg.network.xyz_encoder.Nmax)
+                - math.log(cfg.network.xyz_encoder.Nmin)
+            )
+            / (cfg.network.xyz_encoder.L - 1)
+        )
         self.xyz_encoder = make_encoder(cfg.network.xyz_encoder)
         self.dir_encoder = make_encoder(cfg.network.dir_encoder)
         self.base_mlp = TorchMLP(
             input_dim=self.xyz_encoder.output_dim,
-            output_dim=cfg.network.base_mlp_W,
+            output_dim=cfg.network.geo_feat_dim + 1,
             hidden_dim=cfg.network.base_mlp_W,
             num_layers=cfg.network.base_mlp_D,
             activation=nn.ReLU(),
             out_activation=None,
         )
         self.head_mlp = TorchMLP(
-            input_dim=cfg.network.base_mlp_W - 1 + self.dir_encoder.output_dim,
+            input_dim=cfg.network.geo_feat_dim + self.dir_encoder.output_dim,
             output_dim=3,
             hidden_dim=cfg.network.head_mlp_W,
             num_layers=cfg.network.head_mlp_D,
@@ -36,7 +45,7 @@ class Network(nn.Module):
             out_activation=nn.Sigmoid(),
         )
         self.initialize_weights()
-    
+
     def initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -56,10 +65,9 @@ class Network(nn.Module):
         rgb = self.head_mlp(torch.cat([self.dir_encoder(directions), mlp_out], dim=-1))
         return rgb
 
-    def forward(self, positions: torch.Tensor, directions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, positions: torch.Tensor, directions: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         density, mlp_out = self.get_density(positions)
         rgb = self.get_rgb(directions, mlp_out)
         return rgb, density
-
-
-    

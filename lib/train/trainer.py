@@ -98,12 +98,13 @@ class Trainer:
                 density, _ = self.radiance_field.get_density(x)
                 # logger.info(f"density: {density * render_step_size}")
                 return density * render_step_size
-
-            self.estimator.update_every_n_steps(
-                step=step,
-                occ_eval_fn=occ_eval_fn,
-                occ_thre=1e-2,
-            )
+            
+            with autocast():
+                self.estimator.update_every_n_steps(
+                    step=step,
+                    occ_eval_fn=occ_eval_fn,
+                    occ_thre=1e-2,
+                )
             # t_starts = torch.zeros(rays_o.shape[0], device=rays_o.device)
             # t_ends = torch.ones(rays_o.shape[0], device=rays_o.device)
             # ray_indices = torch.arange(rays_o.shape[0], device=rays_o.device)
@@ -158,6 +159,7 @@ class Trainer:
 
             samples = len(ray_indices)
             tqdm.write(f"samples: {samples}")
+            tqdm.write(f"rays_num: {rays_o.shape[0]}")
             tqdm.write(f"sampling_time: {sampling_time}")
             tqdm.write(f"render_time: {render_time}")
             tqdm.write(f"backward_time: {backward_time}")

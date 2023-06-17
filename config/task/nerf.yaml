@@ -7,16 +7,28 @@ train:
   num_epochs: 1000
 
 network:
-  base_mlp_D: 8
-  base_mlp_W: 256
+  base_mlp_D: 2
+  base_mlp_W: 64
   head_mlp_D: 3
-  head_mlp_W: 128
+  head_mlp_W: 64
+  geo_feat_dim: 15
+  # xyz_encoder:
+  #   type: frequency
+  #   input_dim: 3
+  #   L: 10
   xyz_encoder:
-    type: frequency
-    input_dim: 3
-    L: 10
+    type: hash
+    logT: 19
+    F: 2
+    L: 16
+    Nmin: 16
+    Nmax: 4096
+    x_min: -1.5
+    x_max: 1.5
+    # input_dim: 3
+    # L: 10
   dir_encoder:
-    type: sh
+    type: spherical
     level: 4
     # input_dim: 3
     # L: 4
