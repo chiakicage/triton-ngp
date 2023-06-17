@@ -11,6 +11,10 @@ class FrequencyEncoderConfig(EncoderConfig):
     L: int
 
 @dataclass
+class SphericalHarmonicsEncoderConfig(EncoderConfig):
+    level: int
+
+@dataclass
 class NetworkConfig:
     base_mlp_D: int
     base_mlp_W: int

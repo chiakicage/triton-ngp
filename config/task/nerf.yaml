@@ -16,6 +16,7 @@ network:
     input_dim: 3
     L: 10
   dir_encoder:
-    type: frequency
-    input_dim: 3
-    L: 4
+    type: sh
+    level: 4
+    # input_dim: 3
+    # L: 4

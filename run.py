@@ -16,7 +16,7 @@ cs.store(name="base_config", node=Config)
 def main(cfg: Config):
 	print(cfg.dataset)
 	print(OmegaConf.to_yaml(cfg))
-	cfg.task
+	
 	train_dataset = make_dataset(cfg.dataset, is_train=True)
 	test_dataset = make_dataset(cfg.dataset, is_train=False)
 	network = Network(cfg.task)
