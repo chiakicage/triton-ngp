@@ -26,7 +26,7 @@ class Encoder:
         z2 = z * z
         result = []
         if self.level >= 1:
-            result.append(torch.ones_like(x) * 0.28209479177387814)
+            result.append(torch.ones((x.shape[0], 1)).to(x.device) * 0.28209479177387814)
             if self.level >= 2:
                 result.append(
                     torch.stack(
@@ -36,7 +36,7 @@ class Encoder:
                             0.4886025119029199 * x,
                         ],
                         dim=-1,
-                    )
+                    ).to(x.device)
                 )
                 if self.level >= 3:
                     result.append(
@@ -49,7 +49,7 @@ class Encoder:
                                 0.54627421529603959 * x2 - 0.54627421529603959 * y2,
                             ],
                             dim=-1,
-                        )
+                        ).to(x.device)
                     )
                     if self.level >= 4:
                         result.append(
@@ -64,7 +64,7 @@ class Encoder:
                                     0.59004358992664352 * x * (-x2 + 3.0 * y2),
                                 ],
                                 dim=-1,
-                            )
+                            ).to(x.device)
                         )
         return torch.cat(result, dim=-1)
 

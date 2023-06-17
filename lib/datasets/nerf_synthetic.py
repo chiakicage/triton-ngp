@@ -29,8 +29,6 @@ class Dataset(data.Dataset):
         )
 
         for i, frame in enumerate(json_info["frames"]):
-            if i == 30:
-                break
             image_path = os.path.join(self.data_root, frame["file_path"][2:] + ".png")
             img = np.asarray(imageio.imread(image_path)).astype(np.float32) / 255.0
             img = img[..., :3] * img[..., -1:] + 1 - img[..., -1:]

@@ -9,6 +9,8 @@ import nerfacc
 import logging
 from lib.models.nerf import Network
 from lib.config.task import TaskConfig
+from torch.cuda.amp.autocast_mode import autocast
+from torch.cuda.amp.grad_scaler import GradScaler
 import imageio
 from plyfile import PlyData, PlyElement
 
@@ -16,7 +18,12 @@ logger = logging.getLogger("trainer")
 
 
 class Trainer:
-    def __init__(self, radiance_field: Network, estimator: nerfacc.OccGridEstimator, cfg: TaskConfig):
+    def __init__(
+        self,
+        radiance_field: Network,
+        estimator: nerfacc.OccGridEstimator,
+        cfg: TaskConfig,
+    ):
         self.device = cfg.device
         self.radiance_field = radiance_field
         self.radiance_field = self.radiance_field.to(self.device)
@@ -25,6 +32,7 @@ class Trainer:
             self.radiance_field.parameters(),
             lr=5e-4,
         )
+        self.grad_scaler = GradScaler(2**10)
         self.max_steps = 50000
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(
             self.optimizer,
@@ -53,6 +61,7 @@ class Trainer:
         # self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         # self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
         # self.estimator.load_state_dict(checkpoint["estimator_state_dict"])
+        # self.grad_scaler.load_state_dict(checkpoint["scaler_state_dict"])
 
         for step in tqdm(range(max_steps)):
             self.radiance_field.train()
@@ -101,15 +110,19 @@ class Trainer:
             # density = sigma_fn(t_starts, t_ends, ray_indices)
             # logger.info(f"density: {density}")
             #     # logger.info(f"rays_o: {rays_o}, rays_d: {rays_d}")
-            ray_indices, t_starts, t_ends = self.estimator.sampling(
-                rays_o,
-                rays_d,
-                sigma_fn=sigma_fn,
-                render_step_size=render_step_size,
-                alpha_thre=alpha_thre,
-                cone_angle=cone_angle,
-                stratified=self.radiance_field.training,
-            )
+            start = time.time()
+            with autocast():
+                ray_indices, t_starts, t_ends = self.estimator.sampling(
+                    rays_o,
+                    rays_d,
+                    sigma_fn=sigma_fn,
+                    render_step_size=render_step_size,
+                    alpha_thre=alpha_thre,
+                    cone_angle=cone_angle,
+                    stratified=self.radiance_field.training,
+                )
+            sampling_time = time.time() - start
+
             if ray_indices.shape[0] == 0:
                 continue
             # logger.info(f"ray_indices: {ray_indices.shape[0]}")
@@ -124,16 +137,30 @@ class Trainer:
             #     # logger.info(
             #     #     f"ray_indices: {ray_indices}, t_starts: {t_starts}, t_ends: {t_ends}"
             #     # )
-            rgb, density, depth, extras = nerfacc.rendering(
-                t_starts,
-                t_ends,
-                ray_indices,
-                n_rays=rays_o.shape[0],
-                rgb_sigma_fn=rgb_sigma_fn,
-                render_bkgd=render_bkgd,
-            )
+            with autocast():
+                rgb, density, depth, extras = nerfacc.rendering(
+                    t_starts,
+                    t_ends,
+                    ray_indices,
+                    n_rays=rays_o.shape[0],
+                    rgb_sigma_fn=rgb_sigma_fn,
+                    render_bkgd=render_bkgd,
+                )
+                render_time = time.time() - sampling_time - start
+                loss = F.mse_loss(rgb, rgb_gt)
+                self.grad_scaler.scale(loss).backward()
+                self.grad_scaler.step(self.optimizer)
+                self.grad_scaler.update()
+                # self.optimizer.step()
+                self.scheduler.step()
+                self.optimizer.zero_grad()
+                backward_time = time.time() - sampling_time - render_time - start
+
             samples = len(ray_indices)
             tqdm.write(f"samples: {samples}")
+            tqdm.write(f"sampling_time: {sampling_time}")
+            tqdm.write(f"render_time: {render_time}")
+            tqdm.write(f"backward_time: {backward_time}")
             rays_num = rays_o.shape[0]
             new_rays_num = int(rays_num * (target_sample_batch_size / samples))
             train_dataset.update_rays_num(new_rays_num)
@@ -149,11 +176,7 @@ class Trainer:
             # logger.info(f"rgb: {rgb}")
             # print(rgb)
             # logger.info(f"density: {density}")
-            self.optimizer.zero_grad()
-            loss = F.mse_loss(rgb, rgb_gt)
-            loss.backward()
-            self.optimizer.step()
-            self.scheduler.step()
+
             pnsr = -10.0 * torch.log(loss) / np.log(10.0)
             # logger.info(f"loss: {loss.item()}")
             tqdm.write(f"loss: {loss.item()} pnsr: {pnsr.item()}")
@@ -166,6 +189,7 @@ class Trainer:
                         "optimizer_state_dict": self.optimizer.state_dict(),
                         "scheduler_state_dict": self.scheduler.state_dict(),
                         "estimator_state_dict": self.estimator.state_dict(),
+                        "scaler_state_dict": self.grad_scaler.state_dict(),
                     },
                     model_save_path,
                 )
@@ -173,7 +197,7 @@ class Trainer:
                 self.estimator.eval()
                 with torch.no_grad():
                     # i = torch.randint(0, len(test_dataset), (1,)).item()
-                    i = 20
+                    i = 36
                     data = test_dataset[i]
                     # print(test_dataset.H)
                     # print(test_dataset.imgs[i].shape)
@@ -188,7 +212,7 @@ class Trainer:
                     rays_sample = np.random.choice(rays_o_all.shape[0], 2000)
                     rays_select = np.arange(
                         test_dataset.H // 2 * test_dataset.W,
-                        test_dataset.H // 2 * test_dataset.W + test_dataset.W ,
+                        test_dataset.H // 2 * test_dataset.W + test_dataset.W,
                         1,
                         dtype=np.int32,
                     )
@@ -227,15 +251,25 @@ class Trainer:
                             return rgb, density
 
                         # print(rays_o.shape)
-                        ray_indices, t_starts, t_ends = self.estimator.sampling(
-                            rays_o,
-                            rays_d,
-                            sigma_fn=test_sigma_fn,
-                            render_step_size=render_step_size,
-                            alpha_thre=alpha_thre,
-                            cone_angle=cone_angle,
-                            stratified=self.radiance_field.training,
-                        )
+                        with autocast():
+                            ray_indices, t_starts, t_ends = self.estimator.sampling(
+                                rays_o,
+                                rays_d,
+                                sigma_fn=test_sigma_fn,
+                                render_step_size=render_step_size,
+                                alpha_thre=alpha_thre,
+                                cone_angle=cone_angle,
+                                stratified=self.radiance_field.training,
+                            )
+                            rgb, density, depth, extras = nerfacc.rendering(
+                                t_starts,
+                                t_ends,
+                                ray_indices,
+                                n_rays=rays_o.shape[0],
+                                rgb_sigma_fn=test_rgb_sigma_fn,
+                                render_bkgd=render_bkgd,
+                            )
+                            loss = F.mse_loss(rgb, rgb_gt)
 
                         # print(ray_indices)
                         # mask = torch.repeat_interleave(
@@ -278,15 +312,7 @@ class Trainer:
                         # select.append(positions.cpu().numpy())
 
                         # print(ray_indices.shape)
-                        rgb, density, depth, extras = nerfacc.rendering(
-                            t_starts,
-                            t_ends,
-                            ray_indices,
-                            n_rays=rays_o.shape[0],
-                            rgb_sigma_fn=test_rgb_sigma_fn,
-                            render_bkgd=render_bkgd,
-                        )
-                        loss = F.mse_loss(rgb, rgb_gt)
+
                         # print(f"eval loss: {loss.item()}")
                         losses.append(loss.item())
                         # pnsr = -10.0 * torch.log(loss) / np.log(10.0)
