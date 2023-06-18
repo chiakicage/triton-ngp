@@ -21,8 +21,12 @@ class HashEncodingConfig:
     x_min: float
     x_max: float
 
-BLOCK_SIZE = 512
-
+# BLOCK_SIZE = 512
+@triton.autotune(configs=[
+        triton.Config({}, num_warps=8),
+    ],
+    key=[]
+)
 @triton.jit
 def hash_encoding_fwd_kernel(
     a_ptr,
@@ -30,7 +34,7 @@ def hash_encoding_fwd_kernel(
     output_ptr,
     # weight_ptr,
     # x_ptr,
-    index_ptr,
+    # index_ptr,
     resolution_ptr,
     n_rows,
     T: tl.constexpr,
@@ -46,7 +50,7 @@ def hash_encoding_fwd_kernel(
     b_ptr = b_ptr + pid1 * F * T
     # x_ptr = x_ptr + pid1 * n_rows
     # weight_ptr = weight_ptr + pid1 * n_rows * 3
-    index_ptr = index_ptr + pid1 * n_rows * 8
+    # index_ptr = index_ptr + pid1 * n_rows * 8
 
     block_start = pid0 * BLOCK_SIZE
 
@@ -63,14 +67,14 @@ def hash_encoding_fwd_kernel(
     N = tl.load(resolution_ptr + pid1)
     # input_mask = x_offsets < n_elements
 
-    x = tl.load(a_ptr + x_offsets, mask=mask)
+    x = tl.load(a_ptr + x_offsets, mask=mask).to(tl.float32)
     x = x * N
     x_0 = tl.libdevice.floor(x)
     weight_x = x - x_0
     x_0 = x_0.to(tl.uint32)
     x_1 = x_0 + 1
 
-    y = tl.load(a_ptr + y_offsets, mask=mask)
+    y = tl.load(a_ptr + y_offsets, mask=mask).to(tl.float32)
     y = y * N
     y_0 = tl.libdevice.floor(y)
     weight_y = y - y_0
@@ -80,7 +84,7 @@ def hash_encoding_fwd_kernel(
     y_0 = y_0 * 2654435761
     y_1 = y_1 * 2654435761
 
-    z = tl.load(a_ptr + z_offsets, mask=mask)
+    z = tl.load(a_ptr + z_offsets, mask=mask).to(tl.float32)
     z = z * N
     z_0 = tl.libdevice.floor(z)
     weight_z = z - z_0
@@ -144,14 +148,14 @@ def hash_encoding_fwd_kernel(
     
     
 
-    tl.store(index_ptr + offsets * 8 + 0, index_000, mask=mask)
-    tl.store(index_ptr + offsets * 8 + 1, index_001, mask=mask)
-    tl.store(index_ptr + offsets * 8 + 2, index_010, mask=mask)
-    tl.store(index_ptr + offsets * 8 + 3, index_011, mask=mask)
-    tl.store(index_ptr + offsets * 8 + 4, index_100, mask=mask)
-    tl.store(index_ptr + offsets * 8 + 5, index_101, mask=mask)
-    tl.store(index_ptr + offsets * 8 + 6, index_110, mask=mask)
-    tl.store(index_ptr + offsets * 8 + 7, index_111, mask=mask)
+    # tl.store(index_ptr + offsets * 8 + 0, index_000, mask=mask)
+    # tl.store(index_ptr + offsets * 8 + 1, index_001, mask=mask)
+    # tl.store(index_ptr + offsets * 8 + 2, index_010, mask=mask)
+    # tl.store(index_ptr + offsets * 8 + 3, index_011, mask=mask)
+    # tl.store(index_ptr + offsets * 8 + 4, index_100, mask=mask)
+    # tl.store(index_ptr + offsets * 8 + 5, index_101, mask=mask)
+    # tl.store(index_ptr + offsets * 8 + 6, index_110, mask=mask)
+    # tl.store(index_ptr + offsets * 8 + 7, index_111, mask=mask)
 
     
     
@@ -209,6 +213,11 @@ def hash_encoding_fwd_kernel(
     tl.store(output_ptr + offsets, output_0, mask=mask)
     tl.store(output_ptr + offsets + n_rows, output_1, mask=mask)
 
+@triton.autotune(configs=[
+        triton.Config({}, num_warps=8),
+    ],
+    key=[]
+)
 @triton.jit
 def hash_encoding_bwd_kernel(
     a_ptr,
@@ -247,7 +256,7 @@ def hash_encoding_bwd_kernel(
     N = tl.load(resolution_ptr + pid1)
     # input_mask = x_offsets < n_elements
 
-    x = tl.load(a_ptr + x_offsets, mask=mask)
+    x = tl.load(a_ptr + x_offsets, mask=mask).to(tl.float32)
 
     x = x * N
     x_0 = tl.libdevice.floor(x)
@@ -255,7 +264,7 @@ def hash_encoding_bwd_kernel(
     x_0 = x_0.to(tl.uint32)
     x_1 = x_0 + 1
 
-    y = tl.load(a_ptr + y_offsets, mask=mask)
+    y = tl.load(a_ptr + y_offsets, mask=mask).to(tl.float32)
     y = y * N
     y_0 = tl.libdevice.floor(y)
     weight_y = y - y_0
@@ -265,7 +274,7 @@ def hash_encoding_bwd_kernel(
     y_0 = y_0 * 2654435761
     y_1 = y_1 * 2654435761
 
-    z = tl.load(a_ptr + z_offsets, mask=mask)
+    z = tl.load(a_ptr + z_offsets, mask=mask).to(tl.float32)
     z = z * N
     z_0 = tl.libdevice.floor(z)
     weight_z = z - z_0
@@ -338,22 +347,24 @@ def hash_encoding_bwd_kernel(
     output_0_111 = output_0 * weight_x * weight_y * weight_z
     tl.atomic_add(b_grad_ptr + index_111, output_0_111, mask=mask)
 
+    b_grad_ptr = b_grad_ptr + T
+
     output_1_000 = output_1 * weight_x_n * weight_y_n * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_000 + T, output_1_000, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_000, output_1_000, mask=mask)
     output_1_001 = output_1 * weight_x_n * weight_y_n * weight_z
-    tl.atomic_add(b_grad_ptr + index_001 + T, output_1_001, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_001, output_1_001, mask=mask)
     output_1_010 = output_1 * weight_x_n * weight_y * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_010 + T, output_1_010, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_010, output_1_010, mask=mask)
     output_1_011 = output_1 * weight_x_n * weight_y * weight_z
-    tl.atomic_add(b_grad_ptr + index_011 + T, output_1_011, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_011, output_1_011, mask=mask)
     output_1_100 = output_1 * weight_x * weight_y_n * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_100 + T, output_1_100, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_100, output_1_100, mask=mask)
     output_1_101 = output_1 * weight_x * weight_y_n * weight_z
-    tl.atomic_add(b_grad_ptr + index_101 + T, output_1_101, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_101, output_1_101, mask=mask)
     output_1_110 = output_1 * weight_x * weight_y * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_110 + T, output_1_110, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_110, output_1_110, mask=mask)
     output_1_111 = output_1 * weight_x * weight_y * weight_z
-    tl.atomic_add(b_grad_ptr + index_111 + T, output_1_111, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_111, output_1_111, mask=mask)
 
 
 
@@ -391,8 +402,8 @@ class HashEncoding(Function):
         x = x.T.contiguous()
         # print(x)
         # weight = torch.zeros((L, n_rows, 3), dtype=torch.float32).cuda()
-        index = torch.zeros((L, n_rows, 8), dtype=torch.int32).cuda()
-        output = torch.zeros((L, F, n_rows), dtype=torch.float32).cuda()
+        # index = torch.zeros((L, n_rows, 8), dtype=torch.int32).cuda()
+        output = torch.zeros((L, F, n_rows), dtype=torch.float16).cuda()
         grid = lambda meta: (triton.cdiv(n_rows, meta["BLOCK_SIZE"]), L)
         # xs = torch.zeros((L, n_rows), dtype=torch.int32).cuda()
         hash_encoding_fwd_kernel[grid](
@@ -401,7 +412,7 @@ class HashEncoding(Function):
             output,
             # weight,
             # xs,
-            index,
+            # index,
             resolution,
             n_rows,
             # n_elements,
@@ -431,7 +442,7 @@ class HashEncoding(Function):
         # print(g.shape)
         n_rows = ctx.n_rows
         grid = ctx.grid
-        b_grad = torch.zeros((L, F, T), dtype=torch.float32).cuda()
+        b_grad = torch.zeros((L, F, T), dtype=torch.float16).cuda()
         g = g.reshape(n_rows, L, F).transpose(1, 2).transpose(0, 2).contiguous()
         # print(g.shape)
         hash_encoding_bwd_kernel[grid](
@@ -470,7 +481,7 @@ class HashGrid(nn.Module):
         self.resolution = torch.tensor(self.resolution, dtype=torch.int32).cuda()
 
         self.hashmap = nn.Parameter(
-            torch.zeros((self.L, self.F, self.T)), requires_grad=True
+            torch.zeros((self.L, self.F, self.T), dtype=torch.float16), requires_grad=True
         )
         nn.init.xavier_uniform_(self.hashmap)
         self.encoder = tcnn.Encoding(
@@ -506,9 +517,9 @@ if __name__ == "__main__":
     Nmax = 4096
 
     torch.random.manual_seed(42)
-    a = torch.rand((n_rows, 3), dtype=torch.float32).cuda()
+    a = torch.rand((n_rows, 3), dtype=torch.float16).cuda()
     # print(a)
-    b = torch.randn((L, T, F), dtype=torch.float32).cuda()
+    # b = torch.randn((L, T, F), dtype=torch.float32).cuda()
     # c = torch.zeros((n_rows, L * F), dtype=torch.float32).cuda()
     
 
@@ -537,9 +548,9 @@ if __name__ == "__main__":
     # c = HashEncoding.apply(a, b, resolution, T, F, L)
 
     start = time.time()
-    with autocast():
-        c = hash_encoder(a)
-        gt = torch.rand_like(c)
+    # with autocast():
+    c = hash_encoder(a)
+    gt = torch.rand_like(c)
         # print(c)
 
     fwd_end = time.time()
