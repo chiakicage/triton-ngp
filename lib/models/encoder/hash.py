@@ -7,12 +7,11 @@ import triton.language as tl
 import numpy as np
 from dataclasses import dataclass
 from lib.config.task.nerf import HashEncodingConfig
-from torch.cuda.amp.autocast_mode import custom_bwd, custom_fwd 
+from torch.cuda.amp.autocast_mode import custom_bwd, custom_fwd
 
 import tinycudann as tcnn
 
-
-
+BLOCK_SIZE = 128
 @triton.jit
 def hash_encoding_fwd_kernel(
     a_ptr,
@@ -26,7 +25,9 @@ def hash_encoding_fwd_kernel(
     F: tl.constexpr,
     L: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
+    # **meta
 ):
+    # BLOCK_SIZE = meta["BLOCK_SIZE"]
     pid0 = tl.program_id(0)
     pid1 = tl.program_id(1)
     b_ptr = b_ptr + pid1 * T * F
@@ -87,7 +88,6 @@ def hash_encoding_fwd_kernel(
     # t = tl.full(index_000.shape, 1, dtype=tl.int32)
     # t = (t * T).to(tl.uint32)
     # t = tl.full(index_000.shape, T, dtype=tl.int32).to(tl.uint32)
-
 
     index_000 = index_000 & (T - 1)
     index_001 = index_001 & (T - 1)
@@ -159,7 +159,6 @@ def hash_encoding_fwd_kernel(
     tl.store(output_ptr + offsets * 2 * L + pid1 * 2, output_0, mask=mask)
     tl.store(output_ptr + offsets * 2 * L + pid1 * 2 + 1, output_1, mask=mask)
 
-
 @triton.jit
 def hash_encoding_bwd_kernel(
     b_grad_ptr,
@@ -171,7 +170,9 @@ def hash_encoding_bwd_kernel(
     F: tl.constexpr,
     L: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
+    # **meta
 ):
+    # BLOCK_SIZE = meta["BLOCK_SIZE"]
     pid0 = tl.program_id(0)
     pid1 = tl.program_id(1)
 
@@ -244,19 +245,20 @@ def hash_encoding_bwd_kernel(
 # L = 4
 # Nmin = 16
 # Nmax = 128
-BLOCK_SIZE = 64
+BLOCK_SIZE = 128
 
 
 class HashEncoding(Function):
-    
     @staticmethod
     @custom_fwd
     def forward(
-        ctx, 
-        x: torch.Tensor, 
-        hashmap: torch.Tensor, 
-        resolution: torch.Tensor, 
-        T: int, F: int, L: int,
+        ctx,
+        x: torch.Tensor,
+        hashmap: torch.Tensor,
+        resolution: torch.Tensor,
+        T: int,
+        F: int,
+        L: int,
     ):
         assert len(x.shape) == 2 and x.shape[1] == 3
 
@@ -305,14 +307,12 @@ class HashEncoding(Function):
             weight,
             index,
             n_rows,
-            BLOCK_SIZE=256,
+            BLOCK_SIZE=BLOCK_SIZE,
             T=T,
             F=F,
             L=L,
         )
         return None, b_grad, None, None, None, None
-    
-
 
 
 class HashGrid(nn.Module):
@@ -333,7 +333,7 @@ class HashGrid(nn.Module):
         for i in range(self.L):
             self.resolution.append(int(self.Nmin * self.scaler**i))
         self.resolution = torch.tensor(self.resolution, dtype=torch.int32).cuda()
-        
+
         self.hashmap = nn.Parameter(
             torch.zeros((self.L, self.T, self.F)), requires_grad=True
         )
@@ -352,7 +352,9 @@ class HashGrid(nn.Module):
 
     def forward(self, x):
         x = (x - self.x_min) / (self.x_max - self.x_min)
-        return HashEncoding.apply(x, self.hashmap, self.resolution, self.T, self.F, self.L)
+        return HashEncoding.apply(
+            x, self.hashmap, self.resolution, self.T, self.F, self.L
+        )
         # return self.encoder(x)
 
 
@@ -379,16 +381,18 @@ if __name__ == "__main__":
     c = torch.zeros((n_rows, L * F), dtype=torch.float16).cuda()
     gt = torch.randn((n_rows, L * F), dtype=torch.float16).cuda()
 
-    hash_encoder = HashGrid(HashEncodingConfig(
-        type="hash",
-        logT=10,
-        L=4,
-        F=2,
-        Nmin=16,
-        Nmax=128,
-        x_min=0,
-        x_max=1,
-    )).cuda()
+    hash_encoder = HashGrid(
+        HashEncodingConfig(
+            type="hash",
+            logT=10,
+            L=4,
+            F=2,
+            Nmin=16,
+            Nmax=128,
+            x_min=0,
+            x_max=1,
+        )
+    ).cuda()
 
     scaler = math.exp((math.log(Nmax) - math.log(Nmin)) / (L - 1))
     resolution = []
@@ -419,13 +423,8 @@ if __name__ == "__main__":
 
     # b = hash_encoder.hashmap.detach()
 
-
-
-
     # weight = torch.zeros((L, n_rows, 3), dtype=torch.float32).cuda()
     # index = torch.zeros((L, n_rows, 8), dtype=torch.int32).cuda()
-    
-    
 
     # # c = torch.zeros(1000, dtype=torch.float).cuda()
     # # d = 10000
@@ -470,7 +469,7 @@ if __name__ == "__main__":
     #     F=F,
     #     L=L,
     # )
-    
+
     # print(weight)
     # print(index)
     a = a.cpu().numpy()
