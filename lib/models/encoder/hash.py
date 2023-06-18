@@ -29,7 +29,8 @@ def hash_encoding_fwd_kernel(
     b_ptr,
     output_ptr,
     # weight_ptr,
-    # index_ptr,
+    # x_ptr,
+    index_ptr,
     resolution_ptr,
     n_rows,
     T: tl.constexpr,
@@ -39,21 +40,26 @@ def hash_encoding_fwd_kernel(
     # **meta
 ):
     # BLOCK_SIZE = meta["BLOCK_SIZE"]
-    print("BLOCK_SIZE", BLOCK_SIZE)
+    # print("BLOCK_SIZE", BLOCK_SIZE)
     pid0 = tl.program_id(0)
     pid1 = tl.program_id(1)
-    b_ptr = b_ptr + pid1 * T * F
+    b_ptr = b_ptr + pid1 * F * T
+    # x_ptr = x_ptr + pid1 * n_rows
     # weight_ptr = weight_ptr + pid1 * n_rows * 3
-    # index_ptr = index_ptr + pid1 * n_rows * 8
+    index_ptr = index_ptr + pid1 * n_rows * 8
 
     block_start = pid0 * BLOCK_SIZE
 
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
 
-    x_offsets = offsets * 3
-    y_offsets = x_offsets + 1
-    z_offsets = x_offsets + 2
+    output_ptr = output_ptr + pid1 * F * n_rows
+
+    x_offsets = offsets
+    y_offsets = x_offsets + n_rows
+    z_offsets = y_offsets + n_rows
+
     mask = offsets < n_rows
+
     N = tl.load(resolution_ptr + pid1)
     # input_mask = x_offsets < n_elements
 
@@ -84,6 +90,9 @@ def hash_encoding_fwd_kernel(
     z_0 = z_0 * 805459861
     z_1 = z_1 * 805459861
 
+    # tl.store(x_ptr + x_offsets, z_0.to(tl.int32), mask=mask)
+    
+
     # tl.store(weight_ptr + x_offsets, weight_x, mask=mask)
     # tl.store(weight_ptr + y_offsets, weight_y, mask=mask)
     # tl.store(weight_ptr + z_offsets, weight_z, mask=mask)
@@ -94,45 +103,38 @@ def hash_encoding_fwd_kernel(
 
     index_000 = x_0 ^ y_0 ^ z_0
     index_000 = index_000 & (T - 1)
-    output_0_000 = tl.load(b_ptr + index_000 * 2, mask=mask) * weight_x_n * weight_y_n * weight_z_n
-    output_1_000 = tl.load(b_ptr + index_000 * 2 + 1, mask=mask) * weight_x_n * weight_y_n * weight_z_n
-
-
     index_001 = x_0 ^ y_0 ^ z_1
     index_001 = index_001 & (T - 1)
-    output_0_001 = tl.load(b_ptr + index_001 * 2, mask=mask) * weight_x_n * weight_y_n * weight_z
-    output_1_001 = tl.load(b_ptr + index_001 * 2 + 1, mask=mask) * weight_x_n * weight_y_n * weight_z
-
-
     index_010 = x_0 ^ y_1 ^ z_0
     index_010 = index_010 & (T - 1)
-    output_0_010 = tl.load(b_ptr + index_010 * 2, mask=mask) * weight_x_n * weight_y * weight_z_n
-    output_1_010 = tl.load(b_ptr + index_010 * 2 + 1, mask=mask) * weight_x_n * weight_y * weight_z_n
-
     index_011 = x_0 ^ y_1 ^ z_1
     index_011 = index_011 & (T - 1)
-    output_0_011 = tl.load(b_ptr + index_011 * 2, mask=mask) * weight_x_n * weight_y * weight_z
-    output_1_011 = tl.load(b_ptr + index_011 * 2 + 1, mask=mask) * weight_x_n * weight_y * weight_z
-
     index_100 = x_1 ^ y_0 ^ z_0
     index_100 = index_100 & (T - 1)
-    output_0_100 = tl.load(b_ptr + index_100 * 2, mask=mask) * weight_x * weight_y_n * weight_z_n
-    output_1_100 = tl.load(b_ptr + index_100 * 2 + 1, mask=mask) * weight_x * weight_y_n * weight_z_n 
-
     index_101 = x_1 ^ y_0 ^ z_1
     index_101 = index_101 & (T - 1)
-    output_0_101 = tl.load(b_ptr + index_101 * 2, mask=mask) * weight_x * weight_y_n * weight_z
-    output_1_101 = tl.load(b_ptr + index_101 * 2 + 1, mask=mask) * weight_x * weight_y_n * weight_z
- 
     index_110 = x_1 ^ y_1 ^ z_0
     index_110 = index_110 & (T - 1)
-    output_0_110 = tl.load(b_ptr + index_110 * 2, mask=mask) * weight_x * weight_y * weight_z_n
-    output_1_110 = tl.load(b_ptr + index_110 * 2 + 1, mask=mask) * weight_x * weight_y * weight_z_n
-
     index_111 = x_1 ^ y_1 ^ z_1
     index_111 = index_111 & (T - 1)
-    output_0_111 = tl.load(b_ptr + index_111 * 2, mask=mask) * weight_x * weight_y * weight_z
-    output_1_111 = tl.load(b_ptr + index_111 * 2 + 1, mask=mask) * weight_x * weight_y * weight_z
+
+    output_0_000 = tl.load(b_ptr + index_000, mask=mask) * weight_x_n * weight_y_n * weight_z_n
+    output_0_001 = tl.load(b_ptr + index_001, mask=mask) * weight_x_n * weight_y_n * weight_z
+    output_0_010 = tl.load(b_ptr + index_010, mask=mask) * weight_x_n * weight_y * weight_z_n
+    output_0_011 = tl.load(b_ptr + index_011, mask=mask) * weight_x_n * weight_y * weight_z
+    output_0_100 = tl.load(b_ptr + index_100, mask=mask) * weight_x * weight_y_n * weight_z_n
+    output_0_101 = tl.load(b_ptr + index_101, mask=mask) * weight_x * weight_y_n * weight_z
+    output_0_110 = tl.load(b_ptr + index_110, mask=mask) * weight_x * weight_y * weight_z_n
+    output_0_111 = tl.load(b_ptr + index_111, mask=mask) * weight_x * weight_y * weight_z
+
+    output_1_000 = tl.load(b_ptr + index_000 + T, mask=mask) * weight_x_n * weight_y_n * weight_z_n
+    output_1_001 = tl.load(b_ptr + index_001 + T, mask=mask) * weight_x_n * weight_y_n * weight_z
+    output_1_010 = tl.load(b_ptr + index_010 + T, mask=mask) * weight_x_n * weight_y * weight_z_n
+    output_1_011 = tl.load(b_ptr + index_011 + T, mask=mask) * weight_x_n * weight_y * weight_z
+    output_1_100 = tl.load(b_ptr + index_100 + T, mask=mask) * weight_x * weight_y_n * weight_z_n 
+    output_1_101 = tl.load(b_ptr + index_101 + T, mask=mask) * weight_x * weight_y_n * weight_z
+    output_1_110 = tl.load(b_ptr + index_110 + T, mask=mask) * weight_x * weight_y * weight_z_n
+    output_1_111 = tl.load(b_ptr + index_111 + T, mask=mask) * weight_x * weight_y * weight_z
 
     # t = tl.full(index_000.shape, 1, dtype=tl.int32)
     # t = (t * T).to(tl.uint32)
@@ -142,14 +144,14 @@ def hash_encoding_fwd_kernel(
     
     
 
-    # tl.store(index_ptr + offsets * 8 + 0, index_000, mask=mask)
-    # tl.store(index_ptr + offsets * 8 + 1, index_001, mask=mask)
-    # tl.store(index_ptr + offsets * 8 + 2, index_010, mask=mask)
-    # tl.store(index_ptr + offsets * 8 + 3, index_011, mask=mask)
-    # tl.store(index_ptr + offsets * 8 + 4, index_100, mask=mask)
-    # tl.store(index_ptr + offsets * 8 + 5, index_101, mask=mask)
-    # tl.store(index_ptr + offsets * 8 + 6, index_110, mask=mask)
-    # tl.store(index_ptr + offsets * 8 + 7, index_111, mask=mask)
+    tl.store(index_ptr + offsets * 8 + 0, index_000, mask=mask)
+    tl.store(index_ptr + offsets * 8 + 1, index_001, mask=mask)
+    tl.store(index_ptr + offsets * 8 + 2, index_010, mask=mask)
+    tl.store(index_ptr + offsets * 8 + 3, index_011, mask=mask)
+    tl.store(index_ptr + offsets * 8 + 4, index_100, mask=mask)
+    tl.store(index_ptr + offsets * 8 + 5, index_101, mask=mask)
+    tl.store(index_ptr + offsets * 8 + 6, index_110, mask=mask)
+    tl.store(index_ptr + offsets * 8 + 7, index_111, mask=mask)
 
     
     
@@ -203,15 +205,9 @@ def hash_encoding_fwd_kernel(
     #     + output_1_111 * weight_x * weight_y * weight_z
     # )
 
-    # index = (x ^ (y * 2654435761) ^ (z * 805459861))
-    # t = tl.full(index.shape, T, dtype=tl.int32).to(tl.uint32)
-    # index = index % t
-    # output_0 = tl.load(b_ptr + index * 2, mask=mask)
-    # output_1 = tl.load(b_ptr + index * 2 + 1, mask=mask)
 
-    # # tl.store(index_ptr + offsets, index, mask=mask)
-    tl.store(output_ptr + offsets * 2 * L + pid1 * 2, output_0, mask=mask)
-    tl.store(output_ptr + offsets * 2 * L + pid1 * 2 + 1, output_1, mask=mask)
+    tl.store(output_ptr + offsets, output_0, mask=mask)
+    tl.store(output_ptr + offsets + n_rows, output_1, mask=mask)
 
 @triton.jit
 def hash_encoding_bwd_kernel(
@@ -233,6 +229,7 @@ def hash_encoding_bwd_kernel(
     pid1 = tl.program_id(1)
 
     b_grad_ptr = b_grad_ptr + pid1 * T * F
+    output_ptr = output_ptr + pid1 * F * n_rows
     # weight_ptr = weight_ptr + pid1 * n_rows * 3
     # index_ptr = index_ptr + pid1 * n_rows * 8
 
@@ -243,14 +240,15 @@ def hash_encoding_bwd_kernel(
 
 
 
-    x_offsets = offsets * 3
-    y_offsets = x_offsets + 1
-    z_offsets = x_offsets + 2
+    x_offsets = offsets
+    y_offsets = x_offsets + n_rows
+    z_offsets = y_offsets + n_rows
 
     N = tl.load(resolution_ptr + pid1)
     # input_mask = x_offsets < n_elements
 
     x = tl.load(a_ptr + x_offsets, mask=mask)
+
     x = x * N
     x_0 = tl.libdevice.floor(x)
     weight_x = x - x_0
@@ -298,8 +296,9 @@ def hash_encoding_bwd_kernel(
     # weight_x = tl.load(weight_ptr + offsets * 3 + 0, mask=mask)
     # weight_y = tl.load(weight_ptr + offsets * 3 + 1, mask=mask)
     # weight_z = tl.load(weight_ptr + offsets * 3 + 2, mask=mask)
-    output_0 = tl.load(output_ptr + offsets * 2 * L + pid1 * 2, mask=mask)
-    output_1 = tl.load(output_ptr + offsets * 2 * L + pid1 * 2 + 1, mask=mask)
+    output_0 = tl.load(output_ptr + offsets, mask=mask)
+    output_1 = tl.load(output_ptr + n_rows + offsets, mask=mask)
+
     weight_x_n = 1 - weight_x
     weight_y_n = 1 - weight_y
     weight_z_n = 1 - weight_z
@@ -307,61 +306,62 @@ def hash_encoding_bwd_kernel(
 
     index_000 = x_0 ^ y_0 ^ z_0
     index_000 = index_000 & (T - 1)
+    index_001 = x_0 ^ y_0 ^ z_1
+    index_001 = index_001 & (T - 1)
+    index_010 = x_0 ^ y_1 ^ z_0
+    index_010 = index_010 & (T - 1)
+    index_011 = x_0 ^ y_1 ^ z_1
+    index_011 = index_011 & (T - 1)
+    index_100 = x_1 ^ y_0 ^ z_0
+    index_100 = index_100 & (T - 1)
+    index_101 = x_1 ^ y_0 ^ z_1
+    index_101 = index_101 & (T - 1)
+    index_110 = x_1 ^ y_1 ^ z_0
+    index_110 = index_110 & (T - 1)
+    index_111 = x_1 ^ y_1 ^ z_1
+    index_111 = index_111 & (T - 1)
+
     output_0_000 = output_0 * weight_x_n * weight_y_n * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_000 * 2, output_0_000, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_000, output_0_000, mask=mask)
+    output_0_001 = output_0 * weight_x_n * weight_y_n * weight_z
+    tl.atomic_add(b_grad_ptr + index_001, output_0_001, mask=mask)
+    output_0_010 = output_0 * weight_x_n * weight_y * weight_z_n
+    tl.atomic_add(b_grad_ptr + index_010, output_0_010, mask=mask)
+    output_0_011 = output_0 * weight_x_n * weight_y * weight_z
+    tl.atomic_add(b_grad_ptr + index_011, output_0_011, mask=mask)
+    output_0_100 = output_0 * weight_x * weight_y_n * weight_z_n
+    tl.atomic_add(b_grad_ptr + index_100, output_0_100, mask=mask)
+    output_0_101 = output_0 * weight_x * weight_y_n * weight_z
+    tl.atomic_add(b_grad_ptr + index_101, output_0_101, mask=mask)
+    output_0_110 = output_0 * weight_x * weight_y * weight_z_n
+    tl.atomic_add(b_grad_ptr + index_110, output_0_110, mask=mask)
+    output_0_111 = output_0 * weight_x * weight_y * weight_z
+    tl.atomic_add(b_grad_ptr + index_111, output_0_111, mask=mask)
+
     output_1_000 = output_1 * weight_x_n * weight_y_n * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_000 * 2 + 1, output_1_000, mask=mask)
-
-    # index_001 = x_0 ^ y_0 ^ z_1
-    # index_001 = index_001 & (T - 1)
-    # output_0_001 = output_0 * weight_x_n * weight_y_n * weight_z
-    # tl.atomic_add(b_grad_ptr + index_001 * 2, output_0_001, mask=mask)
-    # output_1_001 = output_1 * weight_x_n * weight_y_n * weight_z
-    # tl.atomic_add(b_grad_ptr + index_001 * 2 + 1, output_1_001, mask=mask)
-
-
-    # index_010 = x_0 ^ y_1 ^ z_0
-    # index_010 = index_010 & (T - 1)
-    # output_0_010 = output_0 * weight_x_n * weight_y * weight_z_n
-    # tl.atomic_add(b_grad_ptr + index_010 * 2, output_0_010, mask=mask)
-    # output_1_010 = output_1 * weight_x_n * weight_y * weight_z_n
-    # tl.atomic_add(b_grad_ptr + index_010 * 2 + 1, output_1_010, mask=mask)
-
-    # index_011 = x_0 ^ y_1 ^ z_1
-    # index_011 = index_011 & (T - 1)
-    # output_0_011 = output_0 * weight_x_n * weight_y * weight_z
-    # tl.atomic_add(b_grad_ptr + index_011 * 2, output_0_011, mask=mask)
-    # output_1_011 = output_1 * weight_x_n * weight_y * weight_z
-    # tl.atomic_add(b_grad_ptr + index_011 * 2 + 1, output_1_011, mask=mask)
-
-    # index_100 = x_1 ^ y_0 ^ z_0
-    # index_100 = index_100 & (T - 1)
-    # output_0_100 = output_0 * weight_x * weight_y_n * weight_z_n
-    # tl.atomic_add(b_grad_ptr + index_100 * 2, output_0_100, mask=mask)
-    # output_1_100 = output_1 * weight_x * weight_y_n * weight_z_n
-    # tl.atomic_add(b_grad_ptr + index_100 * 2 + 1, output_1_100, mask=mask)
-
-    # index_101 = x_1 ^ y_0 ^ z_1
-    # index_101 = index_101 & (T - 1)
-    # output_0_101 = output_0 * weight_x * weight_y_n * weight_z
-    # tl.atomic_add(b_grad_ptr + index_101 * 2, output_0_101, mask=mask)
-    # output_1_101 = output_1 * weight_x * weight_y_n * weight_z
-    # tl.atomic_add(b_grad_ptr + index_101 * 2 + 1, output_1_101, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_000 + T, output_1_000, mask=mask)
+    output_1_001 = output_1 * weight_x_n * weight_y_n * weight_z
+    tl.atomic_add(b_grad_ptr + index_001 + T, output_1_001, mask=mask)
+    output_1_010 = output_1 * weight_x_n * weight_y * weight_z_n
+    tl.atomic_add(b_grad_ptr + index_010 + T, output_1_010, mask=mask)
+    output_1_011 = output_1 * weight_x_n * weight_y * weight_z
+    tl.atomic_add(b_grad_ptr + index_011 + T, output_1_011, mask=mask)
+    output_1_100 = output_1 * weight_x * weight_y_n * weight_z_n
+    tl.atomic_add(b_grad_ptr + index_100 + T, output_1_100, mask=mask)
+    output_1_101 = output_1 * weight_x * weight_y_n * weight_z
+    tl.atomic_add(b_grad_ptr + index_101 + T, output_1_101, mask=mask)
+    output_1_110 = output_1 * weight_x * weight_y * weight_z_n
+    tl.atomic_add(b_grad_ptr + index_110 + T, output_1_110, mask=mask)
+    output_1_111 = output_1 * weight_x * weight_y * weight_z
+    tl.atomic_add(b_grad_ptr + index_111 + T, output_1_111, mask=mask)
 
 
-    # index_110 = x_1 ^ y_1 ^ z_0
-    # index_110 = index_110 & (T - 1)
-    # output_0_110 = output_0 * weight_x * weight_y * weight_z_n
-    # tl.atomic_add(b_grad_ptr + index_110 * 2, output_0_110, mask=mask)
-    # output_1_110 = output_1 * weight_x * weight_y * weight_z_n
-    # tl.atomic_add(b_grad_ptr + index_110 * 2 + 1, output_1_110, mask=mask)
 
-    # index_111 = x_1 ^ y_1 ^ z_1
-    # index_111 = index_111 & (T - 1)
-    # output_0_111 = output_0 * weight_x * weight_y * weight_z
-    # tl.atomic_add(b_grad_ptr + index_111 * 2, output_0_111, mask=mask)
-    # output_1_111 = output_1 * weight_x * weight_y * weight_z
-    # tl.atomic_add(b_grad_ptr + index_111 * 2 + 1, output_1_111, mask=mask)
+
+
+
+
+
 
 
 
@@ -371,7 +371,7 @@ def hash_encoding_bwd_kernel(
 # Nmin = 16
 # Nmax = 128
 
-
+BLOCK_SIZE = 256
 
 class HashEncoding(Function):
     @staticmethod
@@ -388,32 +388,38 @@ class HashEncoding(Function):
         assert len(x.shape) == 2 and x.shape[1] == 3
 
         n_rows = x.shape[0]
+        x = x.T.contiguous()
+        # print(x)
         # weight = torch.zeros((L, n_rows, 3), dtype=torch.float32).cuda()
-        # index = torch.zeros((L, n_rows, 8), dtype=torch.int32).cuda()
-        output = torch.zeros(n_rows * L * F, dtype=torch.float32).cuda()
-        grid = lambda meta: (triton.cdiv(x.shape[0], meta["BLOCK_SIZE"]), L)
+        index = torch.zeros((L, n_rows, 8), dtype=torch.int32).cuda()
+        output = torch.zeros((L, F, n_rows), dtype=torch.float32).cuda()
+        grid = lambda meta: (triton.cdiv(n_rows, meta["BLOCK_SIZE"]), L)
+        # xs = torch.zeros((L, n_rows), dtype=torch.int32).cuda()
         hash_encoding_fwd_kernel[grid](
             x,
             hashmap,
             output,
             # weight,
-            # index,
+            # xs,
+            index,
             resolution,
             n_rows,
             # n_elements,
             # table_size,
-            BLOCK_SIZE=512,
+            BLOCK_SIZE=BLOCK_SIZE,
             T=T,
             F=F,
             L=L,
         )
+        # print(xs)
         ctx.save_for_backward(x, resolution)
         ctx.grid = grid
         ctx.n_rows = n_rows
         ctx.T = T
         ctx.F = F
         ctx.L = L
-        return output.view(n_rows, L * F)
+        # print(index[0])
+        return output.transpose(0, 2).transpose(1, 2).reshape(n_rows, -1)
 
     @staticmethod
     @custom_bwd
@@ -422,9 +428,12 @@ class HashEncoding(Function):
         T = ctx.T
         F = ctx.F
         L = ctx.L
+        # print(g.shape)
         n_rows = ctx.n_rows
         grid = ctx.grid
-        b_grad = torch.zeros(L * T * F, dtype=torch.float32).cuda()
+        b_grad = torch.zeros((L, F, T), dtype=torch.float32).cuda()
+        g = g.reshape(n_rows, L, F).transpose(1, 2).transpose(0, 2).contiguous()
+        # print(g.shape)
         hash_encoding_bwd_kernel[grid](
             x,
             b_grad,
@@ -433,7 +442,7 @@ class HashEncoding(Function):
             # weight,
             # index,
             n_rows,
-            BLOCK_SIZE=512,
+            BLOCK_SIZE=BLOCK_SIZE,
             T=T,
             F=F,
             L=L,
@@ -461,9 +470,9 @@ class HashGrid(nn.Module):
         self.resolution = torch.tensor(self.resolution, dtype=torch.int32).cuda()
 
         self.hashmap = nn.Parameter(
-            torch.zeros(self.L * self.T * self.F), requires_grad=True
+            torch.zeros((self.L, self.F, self.T)), requires_grad=True
         )
-        nn.init.xavier_uniform_(self.hashmap.view(self.L, self.T, self.F))
+        nn.init.xavier_uniform_(self.hashmap)
         self.encoder = tcnn.Encoding(
             n_input_dims=3,
             encoding_config={
@@ -494,10 +503,11 @@ if __name__ == "__main__":
     L = 16
     F = 2
     Nmin = 16
-    Nmax = 128
+    Nmax = 4096
 
     torch.random.manual_seed(42)
     a = torch.rand((n_rows, 3), dtype=torch.float32).cuda()
+    # print(a)
     b = torch.randn((L, T, F), dtype=torch.float32).cuda()
     # c = torch.zeros((n_rows, L * F), dtype=torch.float32).cuda()
     
@@ -540,7 +550,7 @@ if __name__ == "__main__":
 
     # b = hash_encoder.hashmap
 
-    # print(loss)
+    print(loss)
 
     loss.backward()
 
@@ -554,10 +564,10 @@ if __name__ == "__main__":
     # print(hash_encoder.hashmap.grad)
     # print(list(hash_encoder.parameters()))
     # print(b.grad)
-    b_grad = hash_encoder.hashmap.grad
+    # b_grad = hash_encoder.hashmap.grad.transpose(1, 2).contiguous()
     # b_grad = hash_encoder.hashmap.grad
 
-    b = hash_encoder.hashmap
+    # b = hash_encoder.hashmap.transpose(1, 2).contiguous()
 
     # weight = torch.zeros((L, n_rows, 3), dtype=torch.float32).cuda()
     # index = torch.zeros((L, n_rows, 8), dtype=torch.int32).cuda()
@@ -612,6 +622,7 @@ if __name__ == "__main__":
 ###################################
 
     # a = a.cpu().numpy()
+    # # print(a)
     # b = b.detach().cpu().numpy()
 
     # b = torch.tensor(b, requires_grad=True, dtype=torch.float32).cuda()
@@ -640,15 +651,20 @@ if __name__ == "__main__":
     #     x_1 = x_0 + 1
     #     y_1 = y_0 + 1
     #     z_1 = z_0 + 1
+    #     y_0 = y_0 * 2654435761
+    #     y_1 = y_1 * 2654435761
+    #     z_0 = z_0 * 805459861
+    #     z_1 = z_1 * 805459861
 
-    #     index_000 = (x_0 ^ (y_0 * 2654435761) ^ (z_0 * 805459861)) % T
-    #     index_001 = (x_0 ^ (y_0 * 2654435761) ^ (z_1 * 805459861)) % T
-    #     index_010 = (x_0 ^ (y_1 * 2654435761) ^ (z_0 * 805459861)) % T
-    #     index_011 = (x_0 ^ (y_1 * 2654435761) ^ (z_1 * 805459861)) % T
-    #     index_100 = (x_1 ^ (y_0 * 2654435761) ^ (z_0 * 805459861)) % T
-    #     index_101 = (x_1 ^ (y_0 * 2654435761) ^ (z_1 * 805459861)) % T
-    #     index_110 = (x_1 ^ (y_1 * 2654435761) ^ (z_0 * 805459861)) % T
-    #     index_111 = (x_1 ^ (y_1 * 2654435761) ^ (z_1 * 805459861)) % T
+    #     print(z_0.astype(np.int32))
+    #     index_000 = (x_0 ^ y_0 ^ z_0) & (T - 1)
+    #     index_001 = (x_0 ^ y_0 ^ z_1) & (T - 1)
+    #     index_010 = (x_0 ^ y_1 ^ z_0) & (T - 1)
+    #     index_011 = (x_0 ^ y_1 ^ z_1) & (T - 1)
+    #     index_100 = (x_1 ^ y_0 ^ z_0) & (T - 1)
+    #     index_101 = (x_1 ^ y_0 ^ z_1) & (T - 1)
+    #     index_110 = (x_1 ^ y_1 ^ z_0) & (T - 1)
+    #     index_111 = (x_1 ^ y_1 ^ z_1) & (T - 1)
 
     #     weight_x_n = 1 - weight_x
     #     weight_y_n = 1 - weight_y
@@ -726,6 +742,7 @@ if __name__ == "__main__":
     # if b.grad is not None:
     #     print(b.grad.shape)
     #     # print(b.grad)
+    #     print(indexes[0])
     #     print(indexes[0][:, 0])
     #     print(b.grad[0][indexes[0][:, 0]])
     #     print(b_grad[0][indexes[0][:, 0]])
