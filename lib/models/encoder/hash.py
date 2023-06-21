@@ -475,6 +475,7 @@ class HashEncoding(Function):
         assert len(x.shape) == 2 and x.shape[1] == 3
 
         n_rows = x.shape[0]
+        x = x.to(torch.float16)
         x = x.T.contiguous()
         # print(x)
         # weight = torch.zeros((L, n_rows, 3), dtype=torch.float32).cuda()
@@ -535,7 +536,7 @@ class HashEncoding(Function):
             F=F,
             L=L,
         )
-        return None, b_grad, None, None, None, None
+        return None, b_grad.to(torch.float32), None, None, None, None
 
 
 class HashGrid(nn.Module):
@@ -558,7 +559,7 @@ class HashGrid(nn.Module):
         self.resolution = torch.tensor(self.resolution, dtype=torch.int32).cuda()
 
         self.hashmap = nn.Parameter(
-            torch.zeros((self.L, self.F, self.T), dtype=torch.float16), requires_grad=True
+            torch.zeros((self.L, self.F, self.T), dtype=torch.float32), requires_grad=True
         )
         nn.init.xavier_uniform_(self.hashmap)
         self.encoder = tcnn.Encoding(
