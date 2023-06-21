@@ -41,6 +41,7 @@ def hash_encoding_fwd_kernel(
     F: tl.constexpr,
     L: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
+    # BLOCK_SIZE_T: tl.constexpr,
     # **meta
 ):
     # BLOCK_SIZE = meta["BLOCK_SIZE"]
@@ -121,6 +122,80 @@ def hash_encoding_fwd_kernel(
     index_110 = index_110 & (T - 1)
     index_111 = x_1 ^ y_1 ^ z_1
     index_111 = index_111 & (T - 1)
+
+    # output_0_000 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_0_001 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_0_010 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_0_011 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_0_100 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_0_101 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_0_110 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_0_111 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+
+    # output_1_000 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_1_001 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_1_010 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_1_011 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_1_100 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_1_101 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_1_110 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+    # output_1_111 = tl.zeros((BLOCK_SIZE, ), tl.float16)
+
+
+    # for i in tl.static_range(0, arg2=T, step=BLOCK_SIZE_T):
+    #     b_ptr_block = b_ptr + i
+    #     index_mask = mask & (index_000 >= i) & (index_000 < (i + BLOCK_SIZE_T))
+    #     output_0_000_block = tl.load(b_ptr_block + index_000 - i, mask=index_mask)
+    #     tl.atomic_add(output_0_000, output_0_000_block, mask=index_mask)
+    #     index_mask = mask & (index_001 >= i) & (index_001 < (i + BLOCK_SIZE_T))
+    #     output_0_001_block = tl.load(b_ptr_block + index_001 - i, mask=index_mask)
+    #     tl.atomic_add(output_0_001, output_0_001_block, mask=index_mask)
+    #     index_mask = mask & (index_010 >= i) & (index_010 < (i + BLOCK_SIZE_T))
+    #     output_0_010_block = tl.load(b_ptr_block + index_010 - i, mask=index_mask)
+    #     tl.atomic_add(output_0_010, output_0_010_block, mask=index_mask)
+    #     index_mask = mask & (index_011 >= i) & (index_011 < (i + BLOCK_SIZE_T))
+    #     output_0_011_block = tl.load(b_ptr_block + index_011 - i, mask=index_mask)
+    #     tl.atomic_add(output_0_011, output_0_011_block, mask=index_mask)
+    #     index_mask = mask & (index_100 >= i) & (index_100 < (i + BLOCK_SIZE_T))
+    #     output_0_100_block = tl.load(b_ptr_block + index_100 - i, mask=index_mask)
+    #     tl.atomic_add(output_0_100, output_0_100_block, mask=index_mask)
+    #     index_mask = mask & (index_101 >= i) & (index_101 < (i + BLOCK_SIZE_T))
+    #     output_0_101_block = tl.load(b_ptr_block + index_101 - i, mask=index_mask)
+    #     tl.atomic_add(output_0_101, output_0_101_block, mask=index_mask)
+    #     index_mask = mask & (index_110 >= i) & (index_110 < (i + BLOCK_SIZE_T))
+    #     output_0_110_block = tl.load(b_ptr_block + index_110 - i, mask=index_mask)
+    #     tl.atomic_add(output_0_110, output_0_110_block, mask=index_mask)
+    #     index_mask = mask & (index_111 >= i) & (index_111 < (i + BLOCK_SIZE_T))
+    #     output_0_111_block = tl.load(b_ptr_block + index_111 - i, mask=index_mask)
+    #     tl.atomic_add(output_0_111, output_0_111_block, mask=index_mask)
+    
+    # for i in tl.static_range(0, arg2=T, step=BLOCK_SIZE_T):
+    #     b_ptr_block = b_ptr + i + T
+    #     index_mask = mask & (index_000 >= i) & (index_000 < (i + BLOCK_SIZE_T))
+    #     output_1_000_block = tl.load(b_ptr_block + index_000 - i, mask=index_mask)
+    #     tl.atomic_add(output_1_000, output_1_000_block, mask=index_mask)
+    #     index_mask = mask & (index_001 >= i) & (index_001 < (i + BLOCK_SIZE_T))
+    #     output_1_001_block = tl.load(b_ptr_block + index_001 - i, mask=index_mask)
+    #     tl.atomic_add(output_1_001, output_1_001_block, mask=index_mask)
+    #     index_mask = mask & (index_010 >= i) & (index_010 < (i + BLOCK_SIZE_T))
+    #     output_1_010_block = tl.load(b_ptr_block + index_010 - i, mask=index_mask)
+    #     tl.atomic_add(output_1_010, output_1_010_block, mask=index_mask)
+    #     index_mask = mask & (index_011 >= i) & (index_011 < (i + BLOCK_SIZE_T))
+    #     output_1_011_block = tl.load(b_ptr_block + index_011 - i, mask=index_mask)
+    #     tl.atomic_add(output_1_011, output_1_011_block, mask=index_mask)
+    #     index_mask = mask & (index_100 >= i) & (index_100 < (i + BLOCK_SIZE_T))
+    #     output_1_100_block = tl.load(b_ptr_block + index_100 - i, mask=index_mask)
+    #     tl.atomic_add(output_1_100, output_1_100_block, mask=index_mask)
+    #     index_mask = mask & (index_101 >= i) & (index_101 < (i + BLOCK_SIZE_T))
+    #     output_1_101_block = tl.load(b_ptr_block + index_101 - i, mask=index_mask)
+    #     tl.atomic_add(output_1_101, output_1_101_block, mask=index_mask)
+    #     index_mask = mask & (index_110 >= i) & (index_110 < (i + BLOCK_SIZE_T))
+    #     output_1_110_block = tl.load(b_ptr_block + index_110 - i, mask=index_mask)
+    #     tl.atomic_add(output_1_110, output_1_110_block, mask=index_mask)
+    #     index_mask = mask & (index_111 >= i) & (index_111 < (i + BLOCK_SIZE_T))
+    #     output_1_111_block = tl.load(b_ptr_block + index_111 - i, mask=index_mask)
+    #     tl.atomic_add(output_1_111, output_1_111_block, mask=index_mask)
+        
 
     output_0_000 = tl.load(b_ptr + index_000, mask=mask) * weight_x_n * weight_y_n * weight_z_n
     output_0_001 = tl.load(b_ptr + index_001, mask=mask) * weight_x_n * weight_y_n * weight_z
@@ -331,40 +406,40 @@ def hash_encoding_bwd_kernel(
     index_111 = index_111 & (T - 1)
 
     output_0_000 = output_0 * weight_x_n * weight_y_n * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_000, output_0_000, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_000, output_0_000)
     output_0_001 = output_0 * weight_x_n * weight_y_n * weight_z
-    tl.atomic_add(b_grad_ptr + index_001, output_0_001, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_001, output_0_001)
     output_0_010 = output_0 * weight_x_n * weight_y * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_010, output_0_010, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_010, output_0_010)
     output_0_011 = output_0 * weight_x_n * weight_y * weight_z
-    tl.atomic_add(b_grad_ptr + index_011, output_0_011, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_011, output_0_011)
     output_0_100 = output_0 * weight_x * weight_y_n * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_100, output_0_100, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_100, output_0_100)
     output_0_101 = output_0 * weight_x * weight_y_n * weight_z
-    tl.atomic_add(b_grad_ptr + index_101, output_0_101, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_101, output_0_101)
     output_0_110 = output_0 * weight_x * weight_y * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_110, output_0_110, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_110, output_0_110)
     output_0_111 = output_0 * weight_x * weight_y * weight_z
-    tl.atomic_add(b_grad_ptr + index_111, output_0_111, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_111, output_0_111)
 
     b_grad_ptr = b_grad_ptr + T
 
     output_1_000 = output_1 * weight_x_n * weight_y_n * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_000, output_1_000, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_000, output_1_000)
     output_1_001 = output_1 * weight_x_n * weight_y_n * weight_z
-    tl.atomic_add(b_grad_ptr + index_001, output_1_001, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_001, output_1_001)
     output_1_010 = output_1 * weight_x_n * weight_y * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_010, output_1_010, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_010, output_1_010)
     output_1_011 = output_1 * weight_x_n * weight_y * weight_z
-    tl.atomic_add(b_grad_ptr + index_011, output_1_011, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_011, output_1_011)
     output_1_100 = output_1 * weight_x * weight_y_n * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_100, output_1_100, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_100, output_1_100)
     output_1_101 = output_1 * weight_x * weight_y_n * weight_z
-    tl.atomic_add(b_grad_ptr + index_101, output_1_101, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_101, output_1_101)
     output_1_110 = output_1 * weight_x * weight_y * weight_z_n
-    tl.atomic_add(b_grad_ptr + index_110, output_1_110, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_110, output_1_110)
     output_1_111 = output_1 * weight_x * weight_y * weight_z
-    tl.atomic_add(b_grad_ptr + index_111, output_1_111, mask=mask)
+    tl.atomic_add(b_grad_ptr + index_111, output_1_111)
 
 
 
@@ -383,6 +458,7 @@ def hash_encoding_bwd_kernel(
 # Nmax = 128
 
 BLOCK_SIZE = 256
+BLOCK_SIZE_T = 1 << 16
 
 class HashEncoding(Function):
     @staticmethod
@@ -418,6 +494,7 @@ class HashEncoding(Function):
             # n_elements,
             # table_size,
             BLOCK_SIZE=BLOCK_SIZE,
+            # BLOCK_SIZE_T=BLOCK_SIZE_T,
             T=T,
             F=F,
             L=L,
@@ -575,10 +652,10 @@ if __name__ == "__main__":
     # print(hash_encoder.hashmap.grad)
     # print(list(hash_encoder.parameters()))
     # print(b.grad)
-    # b_grad = hash_encoder.hashmap.grad.transpose(1, 2).contiguous()
+    b_grad = hash_encoder.hashmap.grad.transpose(1, 2).contiguous().to(torch.float32)
     # b_grad = hash_encoder.hashmap.grad
 
-    # b = hash_encoder.hashmap.transpose(1, 2).contiguous()
+    b = hash_encoder.hashmap.transpose(1, 2).contiguous().to(torch.float32)
 
     # weight = torch.zeros((L, n_rows, 3), dtype=torch.float32).cuda()
     # index = torch.zeros((L, n_rows, 8), dtype=torch.int32).cuda()
@@ -632,132 +709,133 @@ if __name__ == "__main__":
 
 ###################################
 
-    # a = a.cpu().numpy()
-    # # print(a)
-    # b = b.detach().cpu().numpy()
+    a = a.to(torch.float32).cpu().numpy()
+    # print(a)
+    b = b.detach().cpu().numpy()
 
-    # b = torch.tensor(b, requires_grad=True, dtype=torch.float32).cuda()
-    # b = nn.Parameter(b, requires_grad=True)
-    # # # c = c.cpu().numpy()
-    # x = a[:, 0]
-    # y = a[:, 1]
-    # z = a[:, 2]
+    b = torch.tensor(b, requires_grad=True, dtype=torch.float32).cuda()
+    b = nn.Parameter(b, requires_grad=True)
+    # # c = c.cpu().numpy()
+    x = a[:, 0]
+    y = a[:, 1]
+    z = a[:, 2]
 
-    # results = []
-    # indexes = []
+    results = []
+    indexes = []
+    
 
-    # for i in range(L):
-    #     nx = x * resolution[i].cpu().numpy()
-    #     ny = y * resolution[i].cpu().numpy()
-    #     nz = z * resolution[i].cpu().numpy()
-    #     x_0 = np.floor(nx)
-    #     y_0 = np.floor(ny)
-    #     z_0 = np.floor(nz)
-    #     weight_x = torch.tensor(nx - x_0).cuda()
-    #     weight_y = torch.tensor(ny - y_0).cuda()
-    #     weight_z = torch.tensor(nz - z_0).cuda()
-    #     x_0 = x_0.astype(np.uint32)
-    #     y_0 = y_0.astype(np.uint32)
-    #     z_0 = z_0.astype(np.uint32)
-    #     x_1 = x_0 + 1
-    #     y_1 = y_0 + 1
-    #     z_1 = z_0 + 1
-    #     y_0 = y_0 * 2654435761
-    #     y_1 = y_1 * 2654435761
-    #     z_0 = z_0 * 805459861
-    #     z_1 = z_1 * 805459861
+    for i in range(L):
+        nx = x * resolution[i].cpu().numpy()
+        ny = y * resolution[i].cpu().numpy()
+        nz = z * resolution[i].cpu().numpy()
+        x_0 = np.floor(nx)
+        y_0 = np.floor(ny)
+        z_0 = np.floor(nz)
+        weight_x = torch.tensor(nx - x_0).cuda()
+        weight_y = torch.tensor(ny - y_0).cuda()
+        weight_z = torch.tensor(nz - z_0).cuda()
+        x_0 = x_0.astype(np.uint32)
+        y_0 = y_0.astype(np.uint32)
+        z_0 = z_0.astype(np.uint32)
+        x_1 = x_0 + 1
+        y_1 = y_0 + 1
+        z_1 = z_0 + 1
+        y_0 = y_0 * 2654435761
+        y_1 = y_1 * 2654435761
+        z_0 = z_0 * 805459861
+        z_1 = z_1 * 805459861
 
-    #     print(z_0.astype(np.int32))
-    #     index_000 = (x_0 ^ y_0 ^ z_0) & (T - 1)
-    #     index_001 = (x_0 ^ y_0 ^ z_1) & (T - 1)
-    #     index_010 = (x_0 ^ y_1 ^ z_0) & (T - 1)
-    #     index_011 = (x_0 ^ y_1 ^ z_1) & (T - 1)
-    #     index_100 = (x_1 ^ y_0 ^ z_0) & (T - 1)
-    #     index_101 = (x_1 ^ y_0 ^ z_1) & (T - 1)
-    #     index_110 = (x_1 ^ y_1 ^ z_0) & (T - 1)
-    #     index_111 = (x_1 ^ y_1 ^ z_1) & (T - 1)
+        # print(z_0.astype(np.int32))
+        index_000 = (x_0 ^ y_0 ^ z_0) & (T - 1)
+        index_001 = (x_0 ^ y_0 ^ z_1) & (T - 1)
+        index_010 = (x_0 ^ y_1 ^ z_0) & (T - 1)
+        index_011 = (x_0 ^ y_1 ^ z_1) & (T - 1)
+        index_100 = (x_1 ^ y_0 ^ z_0) & (T - 1)
+        index_101 = (x_1 ^ y_0 ^ z_1) & (T - 1)
+        index_110 = (x_1 ^ y_1 ^ z_0) & (T - 1)
+        index_111 = (x_1 ^ y_1 ^ z_1) & (T - 1)
 
-    #     weight_x_n = 1 - weight_x
-    #     weight_y_n = 1 - weight_y
-    #     weight_z_n = 1 - weight_z
+        weight_x_n = 1 - weight_x
+        weight_y_n = 1 - weight_y
+        weight_z_n = 1 - weight_z
 
-    #     index_000 = torch.tensor(index_000.astype(np.int32), dtype=torch.int32).cuda()
-    #     index_001 = torch.tensor(index_001.astype(np.int32), dtype=torch.int32).cuda()
-    #     index_010 = torch.tensor(index_010.astype(np.int32), dtype=torch.int32).cuda()
-    #     index_011 = torch.tensor(index_011.astype(np.int32), dtype=torch.int32).cuda()
-    #     index_100 = torch.tensor(index_100.astype(np.int32), dtype=torch.int32).cuda()
-    #     index_101 = torch.tensor(index_101.astype(np.int32), dtype=torch.int32).cuda()
-    #     index_110 = torch.tensor(index_110.astype(np.int32), dtype=torch.int32).cuda()
-    #     index_111 = torch.tensor(index_111.astype(np.int32), dtype=torch.int32).cuda()
+        index_000 = torch.tensor(index_000.astype(np.int32), dtype=torch.int32).cuda()
+        index_001 = torch.tensor(index_001.astype(np.int32), dtype=torch.int32).cuda()
+        index_010 = torch.tensor(index_010.astype(np.int32), dtype=torch.int32).cuda()
+        index_011 = torch.tensor(index_011.astype(np.int32), dtype=torch.int32).cuda()
+        index_100 = torch.tensor(index_100.astype(np.int32), dtype=torch.int32).cuda()
+        index_101 = torch.tensor(index_101.astype(np.int32), dtype=torch.int32).cuda()
+        index_110 = torch.tensor(index_110.astype(np.int32), dtype=torch.int32).cuda()
+        index_111 = torch.tensor(index_111.astype(np.int32), dtype=torch.int32).cuda()
 
-    #     output_000 = b[i][index_000]
-    #     output_001 = b[i][index_001]
-    #     output_010 = b[i][index_010]
-    #     output_011 = b[i][index_011]
-    #     output_100 = b[i][index_100]
-    #     output_101 = b[i][index_101]
-    #     output_110 = b[i][index_110]
-    #     output_111 = b[i][index_111]
+        output_000 = b[i][index_000]
+        output_001 = b[i][index_001]
+        output_010 = b[i][index_010]
+        output_011 = b[i][index_011]
+        output_100 = b[i][index_100]
+        output_101 = b[i][index_101]
+        output_110 = b[i][index_110]
+        output_111 = b[i][index_111]
 
-    #     # print(index_000)
+        # print(index_000)
 
-    #     output = (
-    #         output_000 * (weight_x_n * weight_y_n * weight_z_n).reshape((-1, 1))
-    #         + output_001 * (weight_x_n * weight_y_n * weight_z).reshape((-1, 1))
-    #         + output_010 * (weight_x_n * weight_y * weight_z_n).reshape((-1, 1))
-    #         + output_011 * (weight_x_n * weight_y * weight_z).reshape((-1, 1))
-    #         + output_100 * (weight_x * weight_y_n * weight_z_n).reshape((-1, 1))
-    #         + output_101 * (weight_x * weight_y_n * weight_z).reshape((-1, 1))
-    #         + output_110 * (weight_x * weight_y * weight_z_n).reshape((-1, 1))
-    #         + output_111 * (weight_x * weight_y * weight_z).reshape((-1, 1))
-    #     ).to(torch.float32)
-    #     results.append(output)
-    #     index = torch.stack(
-    #         [
-    #             index_000,
-    #             index_001,
-    #             index_010,
-    #             index_011,
-    #             index_100,
-    #             index_101,
-    #             index_110,
-    #             index_111,
-    #         ],
-    #         dim=-1,
-    #     )
-    #     indexes.append(index)
-    #     # print(index)
-    #     # print(
-    #     #     torch.tensor(np.stack(
-    #     #         [
-    #     #             weight_x,
-    #     #             weight_y,
-    #     #             weight_z,
-    #     #         ],
-    #     #         axis=-1,
-    #     #     ))
-    #     # )
+        output = (
+            output_000 * (weight_x_n * weight_y_n * weight_z_n).reshape((-1, 1))
+            + output_001 * (weight_x_n * weight_y_n * weight_z).reshape((-1, 1))
+            + output_010 * (weight_x_n * weight_y * weight_z_n).reshape((-1, 1))
+            + output_011 * (weight_x_n * weight_y * weight_z).reshape((-1, 1))
+            + output_100 * (weight_x * weight_y_n * weight_z_n).reshape((-1, 1))
+            + output_101 * (weight_x * weight_y_n * weight_z).reshape((-1, 1))
+            + output_110 * (weight_x * weight_y * weight_z_n).reshape((-1, 1))
+            + output_111 * (weight_x * weight_y * weight_z).reshape((-1, 1))
+        ).to(torch.float32)
+        results.append(output)
+        index = torch.stack(
+            [
+                index_000,
+                index_001,
+                index_010,
+                index_011,
+                index_100,
+                index_101,
+                index_110,
+                index_111,
+            ],
+            dim=-1,
+        )
+        indexes.append(index)
+        # print(index)
+        # print(
+        #     torch.tensor(np.stack(
+        #         [
+        #             weight_x,
+        #             weight_y,
+        #             weight_z,
+        #         ],
+        #         axis=-1,
+        #     ))
+        # )
 
-    # # results = torch.tensor(np.concatenate(results, axis=-1))
-    # results = torch.cat(results, dim=-1)
-    # loss = torch.nn.functional.mse_loss(results, gt)
+    # results = torch.tensor(np.concatenate(results, axis=-1))
+    results = torch.cat(results, dim=-1)
+    loss = torch.nn.functional.mse_loss(results, gt.to(torch.float32))
 
-    # print(results)
-    # print(loss)
-    # # b.retain_grad()
-    # results.retain_grad()
-    # loss.backward()
-    # if results.grad is not None:
-    #     print(results.grad.shape)
-    #     print(results.grad)
-    # if b.grad is not None:
-    #     print(b.grad.shape)
-    #     # print(b.grad)
-    #     print(indexes[0])
-    #     print(indexes[0][:, 0])
-    #     print(b.grad[0][indexes[0][:, 0]])
-    #     print(b_grad[0][indexes[0][:, 0]])
-    #     print(torch.nn.functional.mse_loss(b.grad, b_grad))
+    print(results)
+    print(loss)
+    # b.retain_grad()
+    results.retain_grad()
+    loss.backward()
+    if results.grad is not None:
+        print(results.grad.shape)
+        print(results.grad)
+    if b.grad is not None:
+        print(b.grad.shape)
+        # print(b.grad)
+        print(indexes[0])
+        print(indexes[0][:, 0])
+        print(b.grad[0][indexes[0][:, 0]])
+        print(b_grad[0][indexes[0][:, 0]])
+        print(torch.nn.functional.mse_loss(b.grad, b_grad))
 
 ###################
     # print(torch.tensor(results))
